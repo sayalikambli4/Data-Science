@@ -1,0 +1,217 @@
+---
+title: "Individual Project: Data analysis and statistics with R"
+author: "Sayali Kambli"
+date: "30/04/2021"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,comment=NA)
+library(ggplot2)
+library(ggthemes)
+library(plotly) 
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+#load the data
+data <- read.csv("mammals_sleep.csv",header = TRUE)
+```
+
+## Index:  
+  
+1.0  Introduction
+
+2.0  Methods
+
+     2.1 Cleaning Dataset          
+     2.2 Analysing Sleep time density distribution     
+     2.3 Analysing summary statistics of Remaining sleep and Awake time       
+     2.4 Analysing Sleep time distribution over vores and conservation types 
+
+3.0  Results
+
+     3.1 Hypothesis Testing
+     3.2 Linear Regression
+
+4.0  Conclusion
+
+5.0  References
+
+## 1.0. Introduction:
+
+The data set that I am using is taken from  *https://moodle.essex.ac.uk/course/view.php?id=15074&section=8*.
+Name of the csv file is **mammals_sleep.csv**.
+    
+    This dataset has biological information  related to sleep time in a day on 83 mammals,
+    which can be used to find  relation between the characteristics of mammals and their sleeping times.
+    I am going to perform hypothesis testing and linear regression in this report.
+
+## 2.0. Methods: 
+### 2.1. Cleaning data
+   
+    Dataset has NA values which can mislead the result.
+```{r clean, echo=FALSE }
+#finding columns having NA values
+coln <- colnames(data)[colSums(is.na(data)) > 0]
+
+```
+Following columns contain NA values:
+ 
+*vore,conservation,sleep_rem,sleep_cycle and brainwt*
+    
+    I have removed this NA values as per the involved processes.
+ 
+### 2.2. Analysing Sleep time density distribution 
+
+Below graph shows Sleep time density distribution:
+
+```{r density, echo=FALSE }
+#Sleep time analyze
+minSleep <-  filter(select(data,name,sleep_total),sleep_total==min(sleep_total))
+maxSleep <-  filter(select(data,name,sleep_total),sleep_total==max(sleep_total))
+meanSleep <-  summarise(data,meanSleep=mean(sleep_total))
+ggplot(data,aes(x=sleep_total)) +geom_density() +
+  labs(title="Total Sleep time density curve",x="Total Sleep(hours)", y = "Density") + 
+  theme_bw()
+ 
+```
+
+   *  *``r minSleep[1]``* has minimum sleep hours of *``r round(minSleep[2],2)``*  whereas *``r maxSleep[1]``* sleeps for maximum hours of *``r round(maxSleep[2],2)``*.
+   *  *``r round(meanSleep,2)``* hours is found to be average sleep time of mammals.
+ 
+### 2.1. Analysing summary statistics of Remaining sleep and Awake time:
+
+Following tables show summary statistics of remaining sleep time and awake time of mammals:
+
+```{r stat, echo=FALSE}
+#remaining sleep time has some NA so removing it
+sleep_rem <-  na.omit(data$sleep_rem)
+#summary of remaining sleep time
+RemSleep <- data.frame(rbind("Remaining Sleep hours"=summary(sleep_rem)))
+#summary of awake time
+Awake <- data.frame(rbind("Awake hours"=summary(data$awake)))
+#displaying data in table
+kable(RemSleep)%>% kable_styling(position = "center",latex_options =c("hold_position"))
+kable(Awake)%>% kable_styling(position = "center",latex_options =c("hold_position"))
+
+```
+
+
+ 
+### 2.2.Analysing Sleep time distribution over vores and conservation types
+
+There are different types of vores and conservation types present in dataset.
+Given graph shows sleep time distribution for these types
+
+```{r voreconser, echo=FALSE }
+#omitting NA from vore and conservation
+datavoreconser <- filter(select(data,vore,sleep_total,conservation),vore != "NA" & conservation != "NA")
+
+vore <- ggplot(datavoreconser, aes(y=sleep_total, x=vore,color=vore))+geom_point()+ labs(x = "vore", y = "Total Sleep",title = "Total sleep hours for vore")
+
+con<-ggplot(datavoreconser, aes(y=sleep_total, x=conservation,color=conservation))+geom_point()+ labs(x = "Conservation", y = "Total Sleep",title = "Total sleep hours for conservation") 
+#plot graphs 
+grid.arrange(vore,con, ncol=1)
+ 
+```
+
+It can be seen from graphs that Sleeping time of Carnivores and LC(Least concern) conservation type mammals are well distributed over range of 0-20 hours. 
+
+## 3.0. Results: 
+
+### 3.1. Hypothesis Testing
+
+I have performed hypothesis testing wrt Sleep time and vores of mammals.
+
+  *H0: Mean sleep time is equal for two vores(omni and carni)*
+
+```{r Hypothesis, echo=FALSE, warning=FALSE}
+#omitting NA from vore for this process
+datavore <- filter(select(data,vore,sleep_total),vore != "NA")
+
+#hypothesis testing
+
+m <- datavore %>% filter(vore %in% c("omni", "carni"))
+omni <- (m %>% filter(vore =="omni"))$sleep_total
+carni <- (m %>% filter(vore =="carni"))$sleep_total
+#performing t test
+testresult<- t.test(omni,carni,alternative = "two.sided")
+#display testresult
+testresult
+
+```
+As per the test result above, there is evidence against H0(p-value is relatively higher) so *Null hypothesis saying(Mean sleep time is equal for two vores(omni and carni)) can not be rejected.*
+
+### 3.2. Linear Regression 
+
+ Linear Regression between Total Sleep and (brain weight and body weight):
+   I have taken Log of Brain weight and Body weight values.
+```{r Covar, echo=FALSE, warning=FALSE, fig.height=6}
+#omitting NA only from brainwt as only it has NA value from set below
+data_df <- filter(select(data,sleep_total,brainwt,bodywt),brainwt != "NA")
+#performing cor test to find covariance
+corr_body_sleep <- cor.test(log(data_df$bodywt),data_df$sleep_total, method="pearson")
+
+corr_brain_sleep <- cor.test(log(data_df$brainwt),data_df$sleep_total, method="pearson")  
+```
+  First of all Checking covariance between them:
+  
+     1. Covariance between Total Sleep and Body Weight is `r corr_body_sleep$estimate`
+     2. Covariance between Total Sleep and Brain Weight is `r corr_brain_sleep$estimate`
+    
+    Both covariance values are relatively strong .So Linear regression can be
+    performed here.(Negative values are anti-correlation, sleep time is more than body or brain weight)
+
+
+Now performing Linear Regression,
+
+
+```{r LR, echo=FALSE, warning=FALSE, fig.height=6}
+
+
+#plotting graph with Linear Regression
+plotbodywt<- ggplot(data_df, aes(x=sleep_total, y= log(bodywt))) +
+  geom_point(col=1, size=1)  + labs(x="Total Sleep",y="Log(body weight)") +
+  geom_smooth(method = "lm", se=FALSE, color="brown", formula = y ~ x)  +theme_stata()
+
+plotbrainwt <- ggplot(data_df, aes(x=sleep_total, y= log(brainwt))) +
+  geom_point(col=1, size=1)  + labs(x="Total Sleep",y="Log(brain weight)") +
+  geom_smooth(method = "lm", se=FALSE, color="brown", formula = y ~ x) +theme_stata()
+#plot graph
+grid.arrange(plotbodywt,plotbrainwt, ncol=1)
+
+#Calculating MAE 
+linearModelbodysleep <- lm(sleep_total ~ log(bodywt), data=data_df)
+linearModelbrainsleep <- lm(sleep_total ~ log(brainwt), data=data_df)
+MAEbodysleep <- mean(abs(linearModelbodysleep$residuals))
+MAEbrainsleep <- mean(abs(linearModelbrainsleep$residuals))
+```
+
+
+
+#### Calculating MAE for models     
+
+* MAE for Linear regression model between Total Sleep and Body Weight is *``r round(MAEbodysleep,2) ``*
+* MAE for Linear regression model between Total Sleep and Brain Weight is *``r round(MAEbrainsleep,2)``*
+
+    Both MAE values are relatively smallest which indicates that Linear regression model 
+    is good fit for this variables.
+
+## 4.0. Conclusion:
+
+*  *``r minSleep[1]``* has minimum sleep hours of *``r round(minSleep[2],2)``*.
+*  *``r maxSleep[1]``* sleeps for maximum hours of *``r round(maxSleep[2],2)``*.
+*  *``r round(meanSleep,2)``* is found to be average sleep time of mammals.
+*  *``r RemSleep$Min``* hours is minimum remaining sleep  whereas *``r RemSleep$Max``* hours is maximum remaining sleep.
+*  *``r round(RemSleep$Mean,2)``* hours is the average remaining sleep time of mammals.
+*  Awake time for mammals ranges from *``r Awake$Min``* hours to  *``r Awake$Max``* hours ,having mean time of *``r round(Awake$Mean,2)``* hours.
+*  Sleeping time of *Carnivores and LC(Least concern)* mammals are well distributed over range of 0-20 hours
+*  Mean sleep time is relatively similar for two vores(omni and carni) of mammals.
+*  *Linear regression* model is good fit for Total Sleep and (brain weight and body weight).
+
+
+## 5.0. References:
+
+* Dataset: https://moodle.essex.ac.uk/mod/resource/view.php?id=805364.
+* CSV File : mammals_sleep.csv

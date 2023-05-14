@@ -1,0 +1,364 @@
+---
+title: 'Exploratory Data Analysis of 120 Years Of Olympic History'
+author: Group:"Tokyo Story":"Abrar Khan, Jay Patel, Neelam Peerzada, Sayali Kambli, Asish Pattnaik"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(dsEssex)
+library(plotly)
+library(ggcorrplot)
+library(dplyr)
+library(tidyverse)
+library(modeest)
+library(ggthemes)
+library(ggpubr)
+library(knitr)
+library(ggplot2)
+library(kableExtra)
+library(ggthemes)
+library(hrbrthemes)
+
+```
+
+
+```{r include=FALSE}
+setwd("C:\\Users\\hp\\Desktop\\Masters\\Spring Term\\304\\Coursework2")
+df <- read.csv("athlete_events.csv" , stringsAsFactors = TRUE) 
+attach(df)
+```
+## Index:  
+  
+1.0  Introduction
+
+2.0  Analyses
+
+     2.1 Summer and Winter Seasons of Olympics          
+     2.2 Variation Of Events in Summer and Winter Seasons Over The Years     
+     2.3 Number of Athletes Over The Years         
+     2.4 Age Distribution of Athletes    
+     2.5 Weight & Height Distribution Among Genders  
+     2.6 Variation Of Weight in Athletes Over The Years                              
+     2.7 Team & Gender Distribution of Athletes      
+     2.8 Women In Sports  
+     2.9 Greatest Olympic Athletes Of All Time      
+     2.10 Greatest Female Olympic Athletes Of All Time      
+     2.11 Top 10 Teams Of Olympics 
+3.0  Conclusion     
+4.0  References
+
+## 1.0. Introduction:
+
+The Kaggle dataset that we have selected can be found in *https://www.kaggle.com/heesoo37/120-years-of-olympic-history-athletes-and-results?select=athlete_events.csv* Within this page you can find the .csv file of **athlete_events.csv**.
+   
+
+## 2.0. Analyses:   
+ 
+ 
+### 2.1. Summer and Winter Seasons of Olympics:
+ 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+WinterCount <- df  %>% select(Year) %>% filter(df$Season == "Winter")
+SummerCount <- df  %>% select(Year) %>% filter(df$Season == "Summer")
+WinterSport <- df  %>% select(Sport) %>% filter(df$Season=="Winter")
+SummerSport <- df  %>% select(Sport) %>% filter(df$Season=="Summer")
+
+SummerFirst <- df  %>% select(Year,Season,Sport,Event) %>% filter(Season=="Summer" & Year==1896 )
+WinterFirst <- df %>% select(Year,Season,Sport,Event) %>% filter(Season=="Winter" & Year==1924)
+SummerLast <- df  %>% select(Year,Season,Sport,Event) %>% filter(Season=="Summer" & Year==2016 )
+WinterLast <- df %>% select(Year,Season,Sport,Event) %>% filter(Season=="Winter" & Year==2014)
+t1 <- head(summary(WinterSport),4)
+t2 <- head(summary(SummerSport),4)
+```
+   
+                        
+* Till *1992* , Summer and Winter games were held in same year.After that seasons were divided such that it will occur on a four year cycle.
+* Total *``r n_distinct(SummerCount)``*  Summer Olympics and *``r n_distinct(WinterCount)``* Winter olympics were held during 1896-2016.           
+         
+             
+ Following are the 5 most participated sports in *Winter Season* and *Summer Season* :   
+\ 
+             
+````{r mostparticipatedsports ,echo=FALSE ,cache = TRUE }
+
+WinterSport <- df %>% filter(Season=="Winter")%>% count(Sport,sort=TRUE,name = "Count")
+SummerSport <- df %>% filter(Season=="Summer")%>% count(Sport,sort=TRUE,name = "Count")
+kable(list(head(select(WinterSport,Winter=Sport,Count),5),head(select(SummerSport,Summer=Sport,Count),5)))%>%
+  kable_styling(latex_options =c("hold_position"), position = "center")%>%
+  column_spec(2,border_left = F, border_right = T)
+```
+\  
+
+
+### 2.2. Variation Of Events in Summer and Winter Seasons Over The Years:
+
+
+* First Summer Olympic was held in *1896* with  *``r length(unique(SummerFirst$Sport))``* sports with *``r length(unique(SummerFirst$Event))``* events. Count reached to *``r length(unique(SummerLast$Sport))``* sports with *``r length(unique(SummerLast$Event))``* events in *2016*.
+* Winter Olymic started  in *1924* with *``r length(unique(WinterFirst$Sport))``* sports with *``r length(unique(WinterFirst$Event))``* events and in *2014* *``r length(unique(WinterLast$Sport))``* sports with *``r length(unique(WinterLast$Event))``* events were played.
+  
+\  
+      
+```{r graph ,message=FALSE, warning=FALSE, echo=FALSE , fig.height=3.5, fig.width=5.0}
+athlete <-  df %>%  arrange(Year) %>% group_by(Season,Year) %>% summarise(value=n_distinct(Event))
+
+ggplot(athlete, aes(x=Year,y=value,color=Season)) +labs(title="Events held in Seasons Over The Years",x="Year",y="No. of Events")+
+  geom_point() +theme_calc()+scale_color_wsj()
+```
+\  
+
+
+### 2.3. Number of Athletes Over The Years:   
+
+
+The bar chart depicts the count of male and female athletes throughout the Olympics. It shows that the number of athletes *increased* over the years, however, Male rate had very notable growth than female. From beginning to *1940*, Female athletic had very lower rate at that time but over the years this data reached a remarkable value.
+
+         
+```{r echo=FALSE, fig.height=4, fig.width=7, warning=FALSE}
+
+YearSex <- ggplot(df, aes(x=Year, fill=Sex)) +
+    geom_bar(color="#4e61d9", alpha=0.6, position = 'identity') + theme(legend.position = "top") + scale_x_continuous(breaks = seq(1896,2016,5)) + labs(x = "Year", y = "Number Of Athletes", title = "Olympic Years and Number of Athletes") + theme(plot.title = element_text(color = "black", size = 10)) +theme(axis.text.x = element_text(angle = 45))
+
+YearSex
+```
+\  
+   
+         
+### 2.4. Age Distribution Of Athletes:
+
+            
+The histogram illustrates the count of male and female athletes according to their *age* in Olympic history. It is quite clear from the graph that majority of the participants were between age group *20* to *30* years , with greater proportion of men then women. Athletes *below 18* years had more females than males.   
+
+```{r echo=FALSE, fig.height=3, fig.width=5, warning=FALSE}
+
+AgeSex <- ggplot(df, aes(x=Age, fill=Sex)) + 
+    geom_bar(color="#4e61d9", alpha=0.6, start = 'identity') + theme(legend.position = "top") + scale_x_continuous(breaks = seq(0,100, 5)) + labs(x = "Age", y = "Number Of Athletes",title = "Age Distribution Of Athletes") + 
+  theme(plot.title = element_text(color = "black", size = 10))
+
+AgeSex
+```
+
+
+### 2.5. Weight & Height Distribution Among Genders:
+
+
+* The *mean height* for male athletes is *``r round(mean(Height[Sex=="M"],na.rm=TRUE) ,2)``* and for *female athletes* it is *``r round(mean(Height[Sex=="F"],na.rm=TRUE) ,2)``*.     
+* The *maximum height* of *``r max(Height[Sex=="M"],na.rm=TRUE)``* has been for *``r unique(Sport[Name=="Yao Ming"])``*.     
+* The *mean weight* for *female athlete's* is *``r round(mean(Weight[Sex=="F"],na.rm=TRUE),2)``* while that of *male athlete's* is *``r round(mean(Weight[Sex=="M"],na.rm=TRUE),2)``*.   
+* The *maximum* weight for male athelete was *``r max(Weight[Sex=="M"],na.rm=TRUE)``* and it turned out to be for *``r unique(Name[Weight=="214"][!is.na(Name[Weight=="214"])])``* who played *``r unique(Sport[Weight=="214"][!is.na(Sport[Weight=="214"])])``* in *``r unique(Event[Weight=="214"][!is.na(Event[Weight=="214"])])``* Event twice in Olympics.     
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE , fig.height=3, fig.width=5}
+WeightDist <- ggplot(df, aes(x=Weight, color=Sex)) +
+geom_density() +
+scale_color_brewer(palette="Dark2") +
+labs(title="Weight density curve",x="Weight(kg)", y = "Density") + 
+theme_minimal()
+
+
+HeightDist <- ggplot(df, aes(x=Height, color=Sex)) +
+geom_density() + scale_color_brewer(palette="Dark2") +
+labs(title="Height density curve",x="Height(cm)", y = "Density") +
+theme_minimal()
+
+
+Final <- ggarrange(WeightDist, HeightDist, ncol = 2)
+Final
+
+
+```
+\  
+
+### 2.6. Variation Of Weight in Athletes Over The Years:
+
+
+The maximum Weight of athletes remained below *150kg* before 1964, after *``r min(unique(Year[Weight>150]),na.rm=TRUE)``* many outliers can be seen for their weight and those Sports are *``r unique(sort(Sport[Weight>150]))``* which is again justified.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE , fig.height=3.5, fig.width=5}
+AthletesWeight <- ggplot(df, aes(x =Year ,  y = Weight,  fill = Sex)) + 
+geom_point(shape=21) +
+scale_x_continuous(breaks = seq(1890, 2020, 20)) + 
+labs(x = "Year", y = "Weight(kg)",fill = "Sex" , title="Variation Of Weight in Gender Over The Years") +
+theme_stata() + 
+scale_color_stata() 
+
+AthletesWeight
+
+
+```
+   
+
+### 2.7. Team & Gender Distribution of Athletes:
+
+   
+```{r fig.height=4, fig.width=5, message=FALSE, warning=FALSE, include=FALSE}
+
+df$Sex<-as.numeric(Sex)
+levels(Sex)<-c(0,1)
+
+df$Sex[df$Sex==2]<-0
+df$counter<-1
+
+```
+   
+*1920* was the first year in Olympics that both genders were allowed to participate for different sports, and over the years the number of female participants grew. *2012 London Olympics* was the first time every participating team had a female athlete representing their country.
+   
+```{r message=FALSE, warning=FALSE, include=FALSE, fig.height=4, fig.width=5}
+# count number of gender participated from each team for each sports
+
+
+sex_athlete <-df %>% filter(!is.na(Sex))%>%
+  group_by(Sport) %>%
+  summarise(ratio_women=sum(Sex)/sum(counter))
+sex_athlete <- data.frame(sex_athlete)
+
+sex_athlete<-sex_athlete %>% arrange(ratio_women)
+
+sex_athlete[(nrow(sex_athlete)-10):nrow(sex_athlete),]
+
+```
+
+   
+### 2.8. Women In Sports:
+
+      
+The following graphs take a deeper dive into the participation *percentage of female athletes* in the Olympics by sports. 
+The first graph shows the *top ten* sports in which female athletes participated in at the Olympics. While,the second graph shows the *bottom* or least number of female participants in sports at the Olympics. The sports with zero female athletes was omitted from this graph.   
+ 
+\      
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3.5, fig.width=3.7}
+
+# count number of gender participated from each team for each sports
+
+
+sex_athlete <-df %>% filter(!is.na(Sex))%>%
+  group_by(Sport) %>%
+  summarise(ratio_women=sum(Sex)/sum(counter))
+sex_athlete <- data.frame(sex_athlete)
+
+sex_athlete<-sex_athlete %>% arrange(ratio_women)
+
+#sex_athlete[(nrow(sex_athlete)-10):nrow(sex_athlete),]
+
+
+top_ten<-sex_athlete[(nrow(sex_athlete)-9):nrow(sex_athlete),]
+sex_athlete<-sex_athlete[sex_athlete$ratio_women!=0,]
+bot_ten<-sex_athlete[1:10,]
+
+
+ggplot(data=top_ten,aes(x=Sport,y=ratio_women))+geom_bar(stat="identity", fill="steelblue")+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(y="Ratio of Women", x="Type of Sport" , title="Most Popular Sports Among Women")
+
+
+ggplot(data=bot_ten,aes(x=Sport,y=ratio_women))+geom_bar(stat="identity", fill="steelblue")+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ylim(0,1) + 
+  labs(y="Ratio of Women",x="Type of Sport",title="Least Popular Sports Among Women")
+
+```
+
+
+### 2.9. Greatest Olympic Athelete Of All Time:
+
+   
+There were many athletes who took part in more than one Olympic events and won many medals. From the below plot its evident that *Michael Fred Phelps, II* is the all time greatest  athlete with *28* medals.
+   
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=4, fig.width=5}
+
+# count number of medals awarded to each athletes
+indiv_medals <- df %>% filter(!is.na(Medal))%>%
+	group_by(Name,Sport) %>%
+	summarise(Medal = n())
+indiv_medals <- data.frame(indiv_medals)
+sort_indiv_medals <- indiv_medals[order(-indiv_medals$Medal),]
+
+#Plot top 10 Athletes
+ggplot(head(sort_indiv_medals,10), aes(x=Name, y=Medal, fill=Medal)) +
+  geom_col() +
+  coord_flip()  +
+  labs(title="The Greatest Olympic Athletes",x="Athletes",y="No.of Medals") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_text(size=6))
+
+```
+      
+      
+### 2.10. Greatest Female Olympic Atheletes Of All Time:
+
+   
+From the below plot its evident that *Larysa Semenivna Latynina (Diriy-)* is the all time greatest female athlete with *18* medals.
+    
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=4, fig.width=5}
+# count number of medals awarded to each  female athletes
+female_medals <- df %>% filter(!is.na(Medal), Sex == 1)%>%
+	group_by(Name,Sport) %>%
+	summarise(Medal = n())
+female_medals <- data.frame(female_medals)
+sort_female_medals <- female_medals[order(-female_medals$Medal),]
+
+#Plot top 10 Female Athletes
+ggplot(head(sort_female_medals,10), aes(x=Name, y=Medal, fill=Medal)) +
+  geom_col() +
+  coord_flip()  +
+  labs(title="The Greatest Female Olympic Athletes",x="Female Athletes",y="No.of Medals")+
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_text(size=6))
+
+```
+
+
+
+### 2.11. Top 10 Teams of Olympics:
+
+   
+From the below plot its evident that *USA,URS and GER* being the 1st,2nd and 3rd teams who won maximum number of medals.Followed by *GBR,FRA,ITA* being on 4th,5th and 6th position.*SWE,CAN,AUS,FIN* were on 7th,8th,9th and 10th positions respectively. 
+   
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=4, fig.width=5}
+
+# count number of medals awarded to each Team(NOC)
+NOC_medals <- df %>% filter(!is.na(Medal))%>%
+	group_by(NOC,Medal) %>%
+	summarise(Medal = n())
+NOC_medals <- data.frame(NOC_medals)
+sort_NOC_medals <- NOC_medals[order(-NOC_medals$Medal),]
+
+#Plot top 10 best performing teams(NOC)
+ggplot(head(sort_NOC_medals,27), aes(x=NOC, y=Medal, fill=Medal)) +
+  geom_col() + 
+  coord_flip()+
+  labs(title="The Top 10 Teams of Olympics",x="Teams",y="No.of Medals") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_text(size=6))
+
+```
+      
+     
+## 3.0. Conclusion:
+
+In conclusion the Olympic data set was used for the following key findings -
+
+* The top five most participated sports during the Summer olympics are *Athletics, Gymnastics, Swimming, Shooting and Cycling*. The top five most participated sports during the Winter season are *Cross Country Skiing, Alpine Skiing, Speed Skating, Ice Hockey and Biathlon*.
+
+* Over the years the number of events have increased for both summer and winter session but the increase in events in summer Olympics are way greater than winter Olympics.
+
+* Over the years the participation of female athletes in Olympics has increased dramatically.
+
+* Highest number of athletes participating in the Olympic games belong to the age bracket of 20 - 30 years.
+
+* Average height for male athletes is 178.86cm and for female athletes is 167.84cm in Olympics and it has been seen that Basketball athletes are the tallest.
+
+* Average weight for female athletes is 60.02Kgs while that of male athletes is 75.74Kgs.Till 1964 the max weight of athletes were below 150kgs after that it have be seen that the athletes are becomes heavier and reached a highest weight of 214 kgs.
+
+* The most popular sports among female athletes are Rhythmic Gymnastics,Synchronized Swimming, softball whereas Boxing and Ski jumping are the least popular sports.
+
+* *Michael Fred Phelps, II* is the greatest male athlete with total 28 medals in Swimming.And *Larysa Semenivia Latynina* is the greatest female athlete with total 18 medals in Gymnastics.
+
+* United States of America, Union of Soviet Socialist Republics and Germany are the top three country with most medals won in the Olympics.
+
+## 4.0. References:
+
+* Dataset: https://www.kaggle.com/heesoo37/120-years-of-olympic-history-athletes-and-results?select=athlete_events.csv 
+

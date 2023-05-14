@@ -1,0 +1,210 @@
+---
+title: "Exploratory Data Analysis of Offenses in Texas"
+author: "Sayali Kambli"
+date: "20/03/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(reshape2)
+library(ggthemes)
+library(hrbrthemes)
+library(leaflet)
+library(tidyverse) 
+library(plotly) 
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+#load the data
+data <- read.csv("37-00049_UOF-P_2016_prepped.csv",header=TRUE)
+data_df <- fortify(data[-1,])
+```
+
+## Index:  
+  
+1.0  Introduction
+
+2.0  Analyses
+
+     2.1 Analysis of Time of incidents          
+     2.2 Types of Offenses    
+     2.3 Distribution of Race of Officers and Offenders         
+     2.4 Gender Distribution of Officers and Offenders     
+     2.5 Relationship between Officer's experience and their violence  
+     2.6 Types of Arrested offenders                             
+     2.7 Variation of Race of Offenders in Texas
+     2.8 Incident reasons in Texas 
+     2.9 Variation of incidents in Year 2016 in Texas  
+    
+3.0  Conclusion
+
+4.0  References
+
+## 1.0. Introduction:
+
+The data set that I am using is taken from  *https://www.kaggle.com/center-for-policing-equity/data-science-for-good*.
+Name of the csv file is **37-00049_UOF-P_2016_prepped.csv**.
+   
+
+## 2.0. Analyses:   
+ 
+ 
+### 2.1. Analysis of Time of incidents:
+Dataset includes time of the incident.Below is the graph that shows top 30 incident times.
+
+```{r a2, echo=FALSE}
+attach(data_df)
+
+#plot graph for time of incidents
+time <- head(summary(as.factor(data_df$INCIDENT_TIME)),30)
+
+Time_df <- data.frame(Time=as.vector(names(time)),Count=as.vector(as.integer(time)))
+plot<- Time_df %>% ggplot(aes(x=reorder(Time,Count),y=Count))+geom_bar(stat="identity",fill="#a17c77")+
+  theme_bw()+xlab("Time of day")+coord_flip()
+ ggplotly(plot)
+```
+ As seen in the graph, most incidents were occurred at night time.
+ 
+ 
+### 2.2. Types of Offenses
+As I mentioned in my first Coursework, list of the 6 most common offenses occurred:
+
+```{r Offense, echo=FALSE }
+
+#Offense types
+
+SUBJECTOFFENSE <- head(summary(as.factor(data_df$SUBJECT_OFFENSE)),6)
+
+SUBJECTOFFENSE_df <- data.frame(SUBJECT_OFFENSE=as.vector(names(SUBJECTOFFENSE)),Count=as.vector(as.integer(SUBJECTOFFENSE)))
+
+kable(SUBJECTOFFENSE_df) %>% kable_styling(position = "center")
+ 
+```
+### 2.3. Distribution of Race of Officers and Offenders
+As I observed in my first coursework, officers and offenders had different race types.
+```{r Race,echo=FALSE}
+#Race Observation
+SUBRACE <- ggplot(data_df, aes(SUBJECT_RACE))+ylab("Incidents")+
+  theme_bw()+geom_bar(fill="#251e3b")+xlab("offenders Race")+ylab("Incident count")
+
+OFFRACE <- ggplot(data_df, aes(OFFICER_RACE))+ylab("Incidents")+
+  theme_bw()+geom_bar(fill="#251e3b")+xlab("Officer Race")+ylab("Incident count")
+
+subplot(ggplotly(OFFRACE), ggplotly(SUBRACE), nrows=1,shareY =TRUE,titleX = TRUE)
+```
+In incidents White officers were more than other races where in case of Offenders Black was the most common race type.
+
+### 2.4. Gender Distribution of Officers and Offenders 
+ As I covered in my first coursework, following is the comparison of Genders in Officers and offenders:
+```{r Gender ,echo=FALSE}
+# Gender comparison
+OFFGEN <- ggplot(data_df, aes(OFFICER_GENDER))+ylab("Incidents")+
+  theme_bw()+ geom_bar(fill=c("#f75ee8", "#282ff7"))+xlab("Officer Gender")+ylab("Incident count")
+
+SUBGEN <- ggplot(filter(data_df,SUBJECT_GENDER %in% c("Female","Male")), aes(SUBJECT_GENDER))+
+  ylab("Incidents")+ 
+  geom_bar(fill=c("#f75ee8", "#282ff7"))+xlab("offender Gender")+
+  theme_bw()+ylab("Incident count")
+
+subplot(ggplotly(OFFGEN), ggplotly(SUBGEN), nrows=1,shareY =TRUE,titleX = TRUE)
+```
+Male Officers/Offenders were way more than Female Officers/Offenders.It looks like Female Offenders were more than Female Officers.
+
+### 2.5. Relationship between Officer's experience and their violence
+
+Total applied force is the count of number of forces Officers used in incident( 0-10).
+So,is there any relationship between experience of officers and their violence?
+I have generated graph which will answer this question.
+```{r violence,echo=FALSE}
+ #Officer years on force vs applied force
+data_df <- data_df %>%mutate(Total_force_Used=sapply(strsplit(data_df$FORCE_EFFECTIV, ","), length))
+ graph2 <- ggplot(data_df,aes(y=as.numeric(OFFICER_YEARS_ON_FORCE),x=Total_force_Used))+geom_point()+theme_stata() + 
+  scale_color_stata() +ylab("OFFICER YEARS ON FORCE")+xlab("Total Force Used")
+ ggplotly(graph2)
+```
+
+As graph shows that Officers working for more years used less number of forces.
+So it can be concluded that officers having less experience are usually more violent than the experienced officers in incidents.
+
+### 2.6. Types of Arrested offenders
+  Following are types of descriptions of offenders in arrests:
+```{r description,echo=FALSE} 
+#arrested subject's description
+arrested_Data <- data_df %>% filter(SUBJECT_WAS_ARRESTED =="Yes")
+graph3 <- ggplot(arrested_Data,aes(x=SUBJECT_DESCRIPTION))+coord_flip()+
+  geom_bar(fill="#faf1aa")+theme_classic()+xlab("Offender DESCRIPTION")+ylab("Count of Arrest")
+ggplotly(graph3)
+```
+
+As bar chart depicts, most times in arrests offender was either mentally unstable or on Alcohol or unknown drugs.
+
+### 2.7. Variation of Race of Offenders in Texas
+```{r map,echo=FALSE, warning=FALSE}
+data1 <-data[-1,]
+dataMAp<- data1 %>% mutate(lat=as.numeric(LOCATION_LATITUDE),long=as.numeric(LOCATION_LONGITUDE))  %>% filter(lat != 0 & long !=0)
+colorselection <- colorFactor(palette =c("purple","maroon","blue","green","pink","Yellow","red"),dataMAp$SUBJECT_RACE)
+dataMAp %>%  leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(color = ~colorselection(SUBJECT_RACE),radius=2) %>%
+  addLegend("bottomright", pal = colorselection, values = ~SUBJECT_RACE,
+            title = "Subject Race")
+```
+As map shows,Black offenders were included in incidents more in South Texas where as White offenders were more in North part of Texas. 
+
+### 2.8. Incident reasons in Texas
+
+Following map shows incident reasons in Texas
+```{r map2, echo=FALSE, warning=FALSE}
+#map of incident reason
+
+dataMAp1 <- dataMAp %>% filter(INCIDENT_REASON != "NULL")
+colorselection <- colorFactor(palette =c("purple","black","blue","green","pink","Yellow","orange","maroon","white","red","grey","light blue","brown"), dataMAp1$INCIDENT_REASON)
+dataMAp1 %>%  leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(color = ~colorselection(INCIDENT_REASON),radius=2) %>%
+  addLegend("bottomright", pal = colorselection, values = ~INCIDENT_REASON,
+            title = "incident reasons")
+```
+
+As it is seen, most common reasons for incidents were Arrest and Service call and they are scattered all over Dallas in Texas
+
+### 2.9. Variation of incidents in Year 2016 in Texas
+
+Below is the incidents count occurred all over year 2016.
+
+```{r year, echo=FALSE, warning=FALSE}
+#Incident in Year 2016
+data_year <- data_df%>%arrange(INCIDENT_DATE) %>% count(INCIDENT_DATE)  %>% mutate(INCIDENT_DATE=as.Date(INCIDENT_DATE,"%m/%d/%y"))
+gbase <- data_year %>% ggplot(aes(x=as.Date(INCIDENT_DATE),y=n))+ geom_line(color="lightblue")+scale_x_date(limit=c(as.Date("2016-01-01"),as.Date("2016-12-31")),date_breaks = "2 month", date_labels = "%b")+
+          xlab("Year 2016")+ylab("Incident count")+theme_stata()
+
+ggplotly(gbase)
+```
+In 2016, incidents were less at end of the year compared with start or mid year.
+
+
+
+## 3.0. Conclusion:
+
+*  Most incidents were occurred at night time.
+*  Male Officers/Offenders were way more than Female Officers/Offenders.
+*  **White officers** and  **Black Offenders** were more than other race types.
+*  officers having less experience were usually more violent than the experienced officers in incidents.
+*  Offenders with  **mentally instability , Alcohol and unknown drugs** were more likely to get arrested.
+*  Most common reasons for incidents were **Arrest and Service call** in Dallas.
+*  Incidents in  **South Texas** had more **Black offenders** than other race types.
+*  Incidents in  **North Texas** had more **White offenders** than other race types.
+*  Incidents were less at end of the year 2016 compared with start or mid year.
+
+## 4.0. References:
+
+* Dataset: https://www.kaggle.com/center-for-policing-equity/data-science-for-good.
+* CSV File : 37-00049_UOF-P_2016_prepped.csv
+
+* 2.2. Types of Offenses : MA304 - Coursework 1 , Author- Sayali Kambli
+* 2.3. Distribution of Race of Officers and Offenders : MA304 - Coursework 1 , Author- Sayali Kambli
+* 2.4. Gender Distribution of Officers and Offenders  : MA304 - Coursework 1 , Author- Sayali Kambli

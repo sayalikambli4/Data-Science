@@ -1,0 +1,352 @@
+---
+title: "MA331 Coursework "
+author: "Sayali Kambli"
+date: "30/03/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(stringr)
+library(lubridate)
+library(dplyr)
+library(tidytext)
+library(textdata)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(ggthemes)
+```
+#  Introduction:
+
+Main purpose of this report is to perform sentiment analysis on two novels from Project Gutenberg Collection,each one from Child and Adult Category[1].Following are the novels I have selected for analysis.
+
+
+#### 1.Child Category :
+
+*Rebecca of Sunnybrook Farm* - It is a  children's novel by Kate Douglas Wiggin, published in 1903, which tells the story of Rebecca and her aunts[2].
+
+#### 2.Adult Category :
+
+*Great Expectations* - It is the thirteenth novel by Charles Dickens,published in 1861 ,which depicts the education of an orphan called Pip[3].
+
+   Sentiment analysis is expected to show some similarity or difference between how adult and child novels keep their audiences engaged.
+
+#  Methods:
+### 1. Analysing data
+
+   Both data-sets have columns Id and text.Text column has text data from novel including Name of the novel,Author and Chapters.I have used *stringr* package to filter chapter count.
+
+```{r start, echo=FALSE}
+#Loading data set
+setwd("C:\\Users\\hp\\Desktop\\Masters\\Spring Term\\331\\coursework\\Courseworkcode")
+#1qsa
+#Loading Child category novel Rebecca of Sunnybrook Farm
+RSFCSV  <- read.csv("498_Rebecca of Sunnybrook Farm.csv")
+#Loading Adult category novel Great Expectations
+GECSV <- read.csv("1400_Great Expectations.csv")
+#Both dataset have first column as id which is not needed so taking only second column of 
+#each novel
+GreatExpectations <- data.frame(text=GECSV[,-1])
+RSF <- data.frame(text=RSFCSV[,-1])
+
+#Chapters Count 
+#for Great Expectations - it has chapter names in Chapter [I,V,X,L] format.so using this pattern
+GreatExpectationsChapterCount<- filter(GreatExpectations,str_detect(GreatExpectations$text,"^Chapter [I,V,X,L]"))
+
+#for Rebecca of Sunnybrook Farm it has chapter count in  [I,V,X] format.so using this pattern
+RSFChapterCount<- filter(RSF,str_detect(RSF$text,"^[I,V,X]+$"))
+```
+  Great Expectations from Adult Category has *``r dim(GreatExpectations)[1]``* rows and *``r as.numeric(count(GreatExpectationsChapterCount))``* chapters.
+  Rebecca of Sunnybrook Farm from Child category has *``r dim(RSF)[1]``* rows and *``r as.numeric(count(RSFChapterCount))``* chapters.
+
+### 2. Cleaning data
+I have removed Id column as it is not required.Then I have found out where both data-set's actual text starts and ends and extracted that part only.As sentiment analysis will be performed,I have also removed empty lines, numbers and non-characters.
+
+```{r cleaning, echo=FALSE}
+#To get main part
+#Searching for start and end of novel Great Expectations
+#head(GreatExpectations,15)
+#tail(GreatExpectations,5)
+
+
+# Great Expectations novel actual text starts from Chapter I and finishes at last index of data.
+# Extracting index for word Chapter I and last index of data.
+GreatExpectationsStart <- GreatExpectations$text %>%  str_which("Chapter I$")
+GreatExpectationsEnd   <- dim(GreatExpectations)[1]
+
+# Extracting text From Chapter I and last index of data
+GreatExpectationsMain <- data.frame(text=GreatExpectations[(GreatExpectationsStart):(GreatExpectationsEnd-1),])
+
+#Searching for start and end of novel Rebecca of Sunnybrook Farm.
+#head(RSF,70)
+#tail(RSF,5)
+#Rebecca of Sunnybrook Farm actual text starts from word I and finishes at last index of data. 
+# Extracting index for word  I and last index of data.
+RSFStart <- RSF$text %>%  str_which("^I$")
+RSFEnd   <- dim(RSF)[1]
+#Extracting text From  I till last line
+RSFMain <- data.frame(text=RSF[(RSFStart):RSFEnd,])
+
+
+#For sentiment analysis- Removing Chapter numbers and empty lines and non-characters
+#Great Expectations - Removing Chapter , numbers and some words like(n.b)  by replacing them to empty space and then removing empty lines and non-characters
+GreatExpectationsMain$text <- GreatExpectationsMain$text  %>% str_replace("^Chapter [I,V,X,L]|\\d|[a-z][.][a-z]","")
+GreatExpectationsFiltered <- GreatExpectationsMain %>% filter(str_detect(GreatExpectationsMain$text,"\\W")) 
+
+
+#Rebecca of Sunnybrook Farm  - Removing Chapters and numbers by replacing them to empty space and then removing empty lines and non characters
+RSFMain$text <- RSFMain$text  %>% str_replace("^[I,V,X]+$|\\d","") 
+
+RSFFiltered <- RSFMain %>% filter(str_detect(RSFMain$text,"\\W")) 
+```
+
+### 3. Extracting Words
+
+Data-sets need to be divided into words to perform sentiment analysis.
+I used *unnest_tokens* function from *tidytext* package to extract word tokens from both novels.
+Following table shows top 4 used words from both novels.
+```{r exracting,echo=FALSE}
+#Great Expectations extracting Words for sentiment analysis
+#using unnest_tokens to extract words 
+GreatExpectationsW  <- GreatExpectationsFiltered %>% filter(text != "") %>%
+  unnest_tokens(word, text, token = "words")
+
+#Rebecca of Sunnybrook Farm extracting Words for sentiment analysis
+RSFW  <- RSFFiltered %>% filter(text != "") %>%
+  unnest_tokens(word, text, token = "words")
+
+#getting most common 4 words with their frequency used in both novels
+GEAll <-GreatExpectationsW %>% count(word) %>% arrange(desc(n)) %>% head(n = 4)
+RSFWAll <- RSFW %>% count(word) %>% arrange(desc(n)) %>% head(n = 4)
+#generating table
+tableallwords <- data.frame(ChildBookWords=RSFWAll$word,ChildBookcount=RSFWAll$n,AdultBookWords=GEAll$word,AdultBookcounts=GEAll$n)
+
+#using kable to display table in proper format
+kable(tableallwords,align="r")  %>% kable_styling(latex_options =c("HOLD_position"))
+```
+As most commonly used words are stopwords and not needed.
+
+### 4. Removing StopWords
+  I  used *stop_words* database from *tidytext* to remove stopwords from my dataset.
+  After removing them,I found most commonly 4 words used.
+  
+```{r removing,echo=FALSE}
+#Stopwords are not needed
+#Filtering stopwords and not needed words(like _i_,_p).
+GreatExpectationsWords <- GreatExpectationsW %>%   filter(!word %in% stop_words$word) %>%  filter(!str_detect(word,"[a-z][.]")) 
+
+
+temp <- str_replace(RSFW$word,"_i_|_$|^_"," ")
+#Filtering stopwords
+RSFWords <- RSFW %>% mutate(word=temp) %>% filter(!word %in% stop_words$word & word != " ")
+RSFWords$word<- RSFWords$word %>% str_trim()
+
+#getting most common 4 words with their frequency used in both novels
+GEAll <-GreatExpectationsWords %>% count(word) %>% arrange(desc(n)) %>% head(n = 4)
+RSFWAll <- RSFWords %>% count(word) %>% arrange(desc(n)) %>% head(n = 4)
+
+#generating table
+tablewords <- data.frame(ChildBookWords=RSFWAll$word,ChildBookcount=RSFWAll$n,AdultBookWords=GEAll$word,AdultBookcounts=GEAll$n)
+
+#using kable to display table in proper format
+kable(tablewords,align="r")  %>% kable_styling(latex_options =c("HOLD_position"))
+
+```
+
+These most common words from both novels are character's names or what they are called.
+
+### 5. Sentiment Analysis
+
+ In sentiment analysis each word is assigned a sentiment like anger,joy or positive.It helps analyze the emotions from the text for human understanding.
+For sentiment analysis, I have used following lexicons from *textdata* package.
+
+1. *nrc lexicon*  to give various sentiments:
+   Here I have compared the frequencies of each sentiment appearing in each novel[4].Then I
+   have calculated a confidence interval for each sentiment in both novels(Adult and child) using log(OR) Where OR is Odds Ratio.[5] 
+
+2. *bing lexicon* to assign words into positive and negative sentiments.
+   Here  I have used net sentiment(positive-negative) to plot these sentiment values over the time period of each novel[6].
+
+\newpage
+
+
+#  Results:
+
+
+## Sentiments association between both novels
+
+```{r result1,echo=FALSE,fig.height=3,fig.width=6}
+### Sentiments association between both novels[4]
+# loading bing lexicon for sentiment analysis
+bing <- get_sentiments("bing") %>%
+  select(word, sentiment)
+
+# loading nrc lexicon for sentiment analysis
+nrc <- get_sentiments("nrc") %>%
+  select(word, sentiment)
+
+#Adding new column for book name 
+#RSF is for Rebecca of Sunnybrook Farm
+GreatExpectationsWords <- GreatExpectationsWords %>% mutate(Book="GreatExpectations")
+RSFWords <- RSFWords %>% mutate(Book="RSF")
+
+#combining both novel's words in one data frame
+AllWords<-data.frame(Word=rbind(word=GreatExpectationsWords,RSFWords))
+
+names(AllWords)[names(AllWords) == "Word.word"] <- "word"
+names(AllWords)[names(AllWords) == "Word.Book"] <- "Book"
+
+#To compute frequency i am using Odds ratio[4]
+## function to compute OR
+#using 0.5 value in case proportion is 0:
+calculate_OR <- function(x, y, correction = TRUE){
+  if(correction){
+    N = (x + 0.5) / (sum(x) -x + 0.5)
+    D = (y + 0.5) / (sum(y) - y + 0.5)
+  } else {
+    N = x / (sum(x) - x)
+    D = y / (sum(y) - y)
+  }
+  OR = N/D
+}
+#Add OR values to data frame and spread the values of book names
+FrequencyTable <- AllWords %>%
+  count(word, Book) %>%
+  spread(Book, n, fill = 0) %>% 
+  mutate(OR = calculate_OR(GreatExpectations, RSF))
+
+#calculating sentiment summary
+sentimentSummary <- AllWords %>%
+  left_join(nrc, by = "word") %>%   # combine by words in AllWords
+  count(Book, sentiment) %>%       #count sentiment
+  spread(Book, n) %>%
+  mutate(sentiment = replace_na(sentiment, replace = "none")) #replacing NA values with the word "none"
+
+#calculate OR for all sentiments
+sentimentSummary <- sentimentSummary %>%
+  mutate(OR = calculate_OR(GreatExpectations, RSF, correction = FALSE)) %>%
+  arrange(desc(OR))
+
+#computing log(odds ratio)[5] for confidence interval
+log_OR <- sentimentSummary %>%
+  mutate(log_OR = log(OR),
+         SE = sqrt(1/GreatExpectations + 1/(sum(GreatExpectations) - GreatExpectations) + 
+                     1/RSF + 1/(sum(RSF) - RSF)),
+         CIhigh = log_OR + qnorm(0.975)*SE,CIlow = log_OR - qnorm(0.975)*SE,
+         sentiment = reorder(sentiment, log_OR))
+
+#ploting sentiments associated with novels[5]
+log_OR %>%
+  ggplot(aes( color=sentiment,x = sentiment, ymax = CIhigh,ymin = CIlow)) +
+  geom_errorbar() +
+  geom_point(aes(sentiment, log_OR),show.legend = FALSE) +
+  geom_hline(yintercept=0, linetype="dotted", color="#141f29", size=1.5) +
+  ylab("Sentiment association between Child and Adult Novels") +
+  xlab("Sentiments") +
+  coord_flip() +theme_bw()+
+  theme(axis.text = element_text(face = "bold", size = 10),
+        axis.title = element_text(face = "bold", size = 12),
+        legend.position = "none")
+```
+
+Graph shows that anger,disgust,fear,negative and sadness sentiments are associated with adult novel. On the other hand, the joy,positive, surprise, and anticipation sentiments are associated with the child novel. Trust and none emotions are close to  both novels.
+
+## Comparing Sadness and Joy in novels
+
+  I have shown different words used for 2 sentiments in both novels.
+  In the case of sadness more words are in adult novel. On the other hand more joyful words are in child novel.
+  
+```{r result2,echo=FALSE,fig.height=3.2,fig.width=7}
+## Words in Sentiments[5]
+#using nrc lexicon
+FrequencyTable %>% inner_join(nrc, by = "word") %>%  #combine by word
+  mutate(sentiment = factor(sentiment, levels = log_OR$sentiment), log_OR = log(OR)) %>%
+  filter(GreatExpectations + RSF > 10 & abs(log_OR) > 1.5 & sentiment %in% c("sadness","joy")) %>% # taking words with  having count total more than 10 and log value of more than 1.5  
+  mutate(word = reorder(word, log_OR)) %>%
+  
+  # ploting graph
+  ggplot(aes(word, log_OR, fill = log_OR < 0)) +
+  facet_wrap(~sentiment, scales = "free_x", nrow = 1) + 
+  geom_bar(stat="identity", show.legend = FALSE) +
+  labs(x = "Word", y = "Log(OR) association between sentiments and words") +
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,colour="#0d0f26", face = "bold", size = 10),
+        axis.text.y = element_text(face = "bold", size = 10,colour="#361930"),
+        strip.text = element_text(face = "bold", size = 12,colour ="#2e0f28"),
+        axis.title = element_text(face = "bold", size = 8))+
+  scale_fill_manual(values = c("#9e428c", "#b02e57"))
+
+```
+
+## Positive-Negative sentiments analysis over the plot of novels
+
+ I have created graph which shows sentiments(positive-negative) analysis over the time period of novels, Where Index keeps track of 90 words section of text.
+
+```{r result3,echo=FALSE,warning=FALSE,fig.height=3,fig.width=7,message=FALSE}
+
+#Positive-Negative sentiments analysis over the plot of novel[6]
+#Here I want to show sentiment variation over the plot in novel
+#taking last index of words in Great Expectations
+GreatExpectationsWords$line <- c(1:dim(GreatExpectationsWords)[1])
+#taking last index of words in Rebecca of Sunnybrook Farm
+RSFWords$line <- c(1:dim(RSFWords)[1])
+#combining both novel's words
+AllWords1<-data.frame(Word=rbind(word=GreatExpectationsWords,RSFWords))
+
+names(AllWords1)[names(AllWords1) == "Word.word"] <- "word"
+names(AllWords1)[names(AllWords1) == "Word.Book"] <- "Book"
+names(AllWords1)[names(AllWords1) == "Word.line"] <- "Index"
+
+#using bing lexicon to join it with all words
+sentiment_Over_period <- AllWords1 %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(Book, index = Index %/% 90, sentiment) %>% #using 90 words section
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+
+#Giving proper names of novels to labels
+labelsNovels <- c(RSF = "Rebecca of Sunnybrook Farm", GreatExpectations = "Great Expectations")
+ggplot(sentiment_Over_period, aes(index, sentiment, fill = Book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~Book, nrow = 1, scales = "free_x",labeller = labeller(Book=labelsNovels))+
+  xlab("Index")+ylab("Sentiment")+theme_stata()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,colour="#0d0f26", face = "bold", size = 10),
+        axis.text.y = element_text(face = "bold", size = 10,colour="#361930"),
+        strip.text = element_text(face = "bold", size = 10,colour ="#155729"),
+        axis.title = element_text(face = "bold", size = 12))+
+  scale_fill_manual(values = c("#477fcc", "#ed4e5c"))
+
+```
+
+ As clearly seen, Adult category book has very few positive sentiments compared with negative sentiments. Whereas child category has more Positive sentiments than negative sentiments.
+
+# Discussion :
+
+    Main challenge of my work  was that I was comparing 2 novels from different categories and 
+    also having different length of words.
+   My main findings are as follows:
+
+     * Author Charles Dickens has used more negative sentiments in Adult novel Great Expectations 
+       to show real world problems and tragedies which will make adults related with.
+    
+     * Author Kate Douglas Wiggin has used more happy sentiments in her Child novel Rebecca 
+       of Sunnybrook Farm like Joy,Surprise to attract and motivate children.
+  
+     * Trust and none emotions are close to both novels.
+    
+So I want to conclude that both novels are expressing well targeting their audiences.
+
+# References :
+
+   I have used following References in my report.
+
+[1]     - *http://data-science.essex.ac.uk:3838/MA331*
+
+[2]     - *https://en.wikipedia.org/wiki/Rebecca_of_Sunnybrook_Farm*
+
+[3]     - *https://en.wikipedia.org/wiki/Great_Expectations*
+
+[4],[5] - *http://data-science.essex.ac.uk:3838/MA331/W9/#section-iii.-sentiment-analysis*
+
+[6]     - *https://www.tidytextmining.com/sentiment.html*
